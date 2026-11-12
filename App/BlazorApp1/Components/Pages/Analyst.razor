@@ -1,0 +1,262 @@
+@page "/analyst"
+@inject AnalystQueryService AnalystQueryService
+
+<PageTitle>AI Data Analyst · QueryPilot</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="py-6">
+    <MudStack Spacing="4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <MudStack Spacing="1">
+                <MudText Typo="Typo.overline">NORTHWIND · POSTGRESQL</MudText>
+                <MudText Typo="Typo.h4">AI Data Analyst</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Ask a question. The AI generates SQL and QueryPilot displays the database results.
+                </MudText>
+            </MudStack>
+            <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined">
+                Read-only queries
+            </MudChip>
+        </MudStack>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="5">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudStack Spacing="3">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.h6">Ask your data</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    Questions are sent to the configured Python AI service.
+                                </MudText>
+                            </MudStack>
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
+                                           AriaLabel="Clear conversation"
+                                           Disabled="@IsLoading"
+                                           OnClick="ClearConversation" />
+                        </MudStack>
+
+                        <MudPaper Outlined="true" Class="pa-3" Style="min-height: 220px; max-height: 420px; overflow-y: auto;">
+                            <MudStack Spacing="3">
+                                @if (Messages.Count == 0)
+                                {
+                                    <MudAlert Severity="Severity.Info" Variant="Variant.Text">
+                                        Your conversation will appear here. Ask a question to get started.
+                                    </MudAlert>
+                                }
+                                @foreach (var message in Messages)
+                                {
+                                    <MudPaper Outlined="true" Class="pa-3">
+                                        <MudStack Spacing="1">
+                                            <MudText Typo="Typo.caption" Color="@(message.IsAssistant ? Color.Primary : Color.Secondary)">
+                                                @(message.IsAssistant ? "QueryPilot" : "You")
+                                                · @message.CreatedAt.ToString("t")
+                                            </MudText>
+                                            <MudText Typo="Typo.body2">@message.Text</MudText>
+                                        </MudStack>
+                                    </MudPaper>
+                                }
+                                @if (IsLoading)
+                                {
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+                                        <MudText Typo="Typo.body2">Generating SQL and querying Northwind…</MudText>
+                                    </MudStack>
+                                }
+                            </MudStack>
+                        </MudPaper>
+
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">TRY A QUESTION</MudText>
+                        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1">
+                            @foreach (var suggestion in Suggestions)
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           Size="Size.Small"
+                                           Disabled="@IsLoading"
+                                           OnClick="@(() => AskAsync(suggestion))">
+                                    @suggestion
+                                </MudButton>
+                            }
+                        </MudStack>
+
+                        <form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
+                            <MudStack Spacing="2">
+                                <MudTextField T="string"
+                                              @bind-Value="Draft"
+                                              Label="Your question"
+                                              Placeholder="e.g. Which products generated the most revenue?"
+                                              Variant="Variant.Outlined"
+                                              Lines="3"
+                                              MaxLength="500"
+                                              Disabled="@IsLoading" />
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        SQL is executed in a read-only transaction.
+                                    </MudText>
+                                    <MudButton ButtonType="ButtonType.Submit"
+                                               Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Send"
+                                               Disabled="@(IsLoading || string.IsNullOrWhiteSpace(Draft))">
+                                        Ask
+                                    </MudButton>
+                                </MudStack>
+                            </MudStack>
+                        </form>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" lg="7">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudStack Spacing="3">
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.h6">Query results</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Results, chart, and SQL for your latest question.
+                            </MudText>
+                        </MudStack>
+
+                        @if (CurrentResult is null)
+                        {
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Text">
+                                Submit a question to see its generated SQL and live Northwind results here.
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined">
+                                @CurrentResult.Summary
+                            </MudAlert>
+
+                            @if (CurrentResult.ChartLabels.Length > 0)
+                            {
+                                <MudChart T="double"
+                                          ChartType="ChartType.Bar"
+                                          ChartSeries="@ChartSeries"
+                                          ChartLabels="@CurrentResult.ChartLabels"
+                                          Width="100%"
+                                          Height="280px" />
+                            }
+
+                            <MudExpansionPanels>
+                                <MudExpansionPanel Text="@($"Rows ({CurrentResult.Data.Rows.Count})")">
+                                    @if (CurrentResult.Data.IsTruncated)
+                                    {
+                                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                                            Results are limited to the first @CurrentResult.Data.Rows.Count rows.
+                                        </MudAlert>
+                                    }
+                                    @if (CurrentResult.Data.Rows.Count == 0)
+                                    {
+                                        <MudText Typo="Typo.body2">The query returned no rows.</MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudTable T="IReadOnlyList<object?>"
+                                                  Items="@CurrentResult.Data.Rows"
+                                                  Dense="true"
+                                                  Hover="true"
+                                                  Striped="true"
+                                                  Bordered="true">
+                                            <HeaderContent>
+                                                @foreach (var column in CurrentResult.Data.Columns)
+                                                {
+                                                    <MudTh>@column</MudTh>
+                                                }
+                                            </HeaderContent>
+                                            <RowTemplate Context="row">
+                                                @for (var index = 0; index < CurrentResult.Data.Columns.Count; index++)
+                                                {
+                                                    <MudTd DataLabel="@CurrentResult.Data.Columns[index]">
+                                                        @FormatValue(row[index])
+                                                    </MudTd>
+                                                }
+                                            </RowTemplate>
+                                        </MudTable>
+                                    }
+                                </MudExpansionPanel>
+                                <MudExpansionPanel Text="Generated SQL">
+                                    <MudPaper Outlined="true" Class="pa-3">
+                                        <pre><code>@CurrentResult.Sql</code></pre>
+                                    </MudPaper>
+                                </MudExpansionPanel>
+                            </MudExpansionPanels>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </MudStack>
+</MudContainer>
+
+@code {
+    private static readonly string[] Suggestions =
+    [
+        "How many orders are there by country?",
+        "Which products generated the most revenue?",
+        "Show monthly sales totals"
+    ];
+
+    private readonly List<ChatMessage> Messages = [];
+    private string Draft { get; set; } = string.Empty;
+    private bool IsLoading { get; set; }
+    private AnalystResult? CurrentResult { get; set; }
+
+    private List<ChartSeries<double>> ChartSeries =>
+        CurrentResult?.ChartSeriesName is null
+            ? []
+            : [
+                new ChartSeries<double>
+                {
+                    Name = CurrentResult.ChartSeriesName,
+                    Data = CurrentResult.ChartValues
+                }
+            ];
+
+    private async Task SubmitAsync()
+    {
+        await AskAsync(Draft);
+    }
+
+    private async Task AskAsync(string question)
+    {
+        question = question.Trim();
+        if (question.Length == 0 || IsLoading)
+        {
+            return;
+        }
+
+        Messages.Add(new ChatMessage(question, false, DateTimeOffset.Now));
+        Draft = string.Empty;
+        IsLoading = true;
+
+        try
+        {
+            CurrentResult = await AnalystQueryService.AskAsync(question);
+            Messages.Add(new ChatMessage(CurrentResult.Summary, true, DateTimeOffset.Now));
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void ClearConversation()
+    {
+        Messages.Clear();
+        CurrentResult = null;
+        Draft = string.Empty;
+    }
+
+    private static string FormatValue(object? value) =>
+        value switch
+        {
+            null or DBNull => "NULL",
+            DateTime dateTime => dateTime.ToString("yyyy-MM-dd"),
+            DateOnly date => date.ToString("yyyy-MM-dd"),
+            IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.CurrentCulture),
+            _ => value.ToString() ?? string.Empty
+        };
+
+    private sealed record ChatMessage(string Text, bool IsAssistant, DateTimeOffset CreatedAt);
+}

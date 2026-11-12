@@ -1,0 +1,32 @@
+html, body {
+    min-height: 100%;
+}
+
+body {
+    margin: 0;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    right: 1rem;
+    bottom: 1rem;
+    padding: .75rem 2.5rem .75rem 1rem;
+    border: 1px solid var(--mud-palette-error);
+    border-radius: var(--mud-default-borderradius);
+    background: var(--mud-palette-surface);
+    box-shadow: var(--mud-elevation-8);
+    color: var(--mud-palette-error);
+}
+
+#blazor-error-ui .reload {
+    margin-left: .5rem;
+}
+
+#blazor-error-ui .dismiss {
+    position: absolute;
+    top: .5rem;
+    right: .75rem;
+    cursor: pointer;
+}

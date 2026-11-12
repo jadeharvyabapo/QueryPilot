@@ -1,0 +1,59 @@
+# .NET / Blazor build output and user-specific files
+**/bin/
+**/obj/
+**/TestResults/
+**/.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+**/env/
+**/ENV/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.tox/
+**/htmlcov/
+**/.coverage
+**/.coverage.*
+**/*.egg-info/
+**/.ipynb_checkpoints/
+
+# Local environment variables and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+**/secrets/
+**/credentials.json
+**/*.pem
+**/*.key
+
+# Local logs and temporary files
+**/*.log
+**/logs/
+**/tmp/
+**/temp/
+
+# ML experiment output and model weights (keep code and configs tracked)
+**/wandb/
+**/mlruns/
+**/*.pt
+**/*.pth
+**/*.ckpt
+**/*.safetensors
+
+# IDE
+**/.idea/
+**/.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

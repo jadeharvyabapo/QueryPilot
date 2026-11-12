@@ -1,0 +1,194 @@
+@page "/"
+@using System.Globalization
+@inject DashboardService DashboardService
+@inject ILogger<Home> Logger
+
+<PageTitle>Dashboard · QueryPilot</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="py-6">
+    <MudStack Spacing="4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <MudStack Spacing="1">
+                <MudText Typo="Typo.overline">NORTHWIND · POSTGRESQL</MudText>
+                <MudText Typo="Typo.h4">Sales overview</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Live metrics from your Northwind database.</MudText>
+            </MudStack>
+            <MudButton Href="/analyst"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AutoAwesome">
+                Ask your data
+            </MudButton>
+        </MudStack>
+
+        @if (IsLoading)
+        {
+            <MudPaper Outlined="true" Class="pa-8">
+                <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                    <MudText Typo="Typo.body2">Loading Northwind sales data…</MudText>
+                </MudStack>
+            </MudPaper>
+        }
+        else if (LoadError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                @LoadError
+            </MudAlert>
+            <MudButton Variant="Variant.Outlined" OnClick="LoadSnapshotAsync">Retry</MudButton>
+        }
+        else if (Snapshot is not null)
+        {
+            <MudGrid Spacing="3">
+                @foreach (var metric in Snapshot.Metrics)
+                {
+                    <MudItem xs="12" sm="6" lg="3">
+                        <MudPaper Outlined="true" Class="pa-4">
+                            <MudStack Spacing="2">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@metric.Label</MudText>
+                                    <MudIcon Icon="@GetMetricIcon(metric.Icon)" Color="Color.Primary" />
+                                </MudStack>
+                                <MudText Typo="Typo.h5">@metric.Value</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                }
+            </MudGrid>
+
+            <MudGrid Spacing="3">
+                <MudItem xs="12" lg="8">
+                    <MudPaper Outlined="true" Class="pa-4">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudStack Spacing="1">
+                                    <MudText Typo="Typo.h6">Revenue by month</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Most recent months with orders in the database
+                                    </MudText>
+                                </MudStack>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                                    @Snapshot.TotalSales.ToString("C0", CultureInfo.GetCultureInfo("en-US"))
+                                </MudChip>
+                            </MudStack>
+
+                            @if (Snapshot.MonthLabels.Length > 0)
+                            {
+                                <MudChart T="double"
+                                          ChartType="ChartType.Line"
+                                          ChartSeries="@RevenueSeries"
+                                          ChartLabels="@Snapshot.MonthLabels"
+                                          Width="100%"
+                                          Height="300px" />
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Text">
+                                    No dated orders were found in Northwind.
+                                </MudAlert>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12" lg="4">
+                    <MudPaper Outlined="true" Class="pa-4">
+                        <MudStack Spacing="2">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.h6">Top product categories</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Sales share from order details</MudText>
+                            </MudStack>
+
+                            @if (Snapshot.Categories.Count > 0)
+                            {
+                                <MudChart T="double"
+                                          ChartType="ChartType.Bar"
+                                          ChartSeries="@CategorySeries"
+                                          ChartLabels="@CategoryLabels"
+                                          Width="100%"
+                                          Height="300px" />
+                                @foreach (var category in Snapshot.Categories)
+                                {
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                        <MudText Typo="Typo.body2">@category.Name</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            @category.Sales.ToString("C0", CultureInfo.GetCultureInfo("en-US")) · @category.Share.ToString("N1")%
+                                        </MudText>
+                                    </MudStack>
+                                }
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Text">
+                                    No product sales were found.
+                                </MudAlert>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+    </MudStack>
+</MudContainer>
+
+@code {
+    private DashboardSnapshot? Snapshot { get; set; }
+    private bool IsLoading { get; set; } = true;
+    private string? LoadError { get; set; }
+
+    private List<ChartSeries<double>> RevenueSeries =>
+        Snapshot is null
+            ? []
+            : [
+                new ChartSeries<double>
+                {
+                    Name = "Revenue",
+                    Data = Snapshot.MonthlySales
+                }
+            ];
+
+    private List<ChartSeries<double>> CategorySeries =>
+        Snapshot is null
+            ? []
+            : [
+                new ChartSeries<double>
+                {
+                    Name = "Sales",
+                    Data = Snapshot.Categories.Select(category => (double)category.Sales).ToArray()
+                }
+            ];
+
+    private string[] CategoryLabels =>
+        Snapshot?.Categories.Select(category => category.Name).ToArray() ?? [];
+
+    protected override Task OnInitializedAsync() => LoadSnapshotAsync();
+
+    private async Task LoadSnapshotAsync()
+    {
+        IsLoading = true;
+        LoadError = null;
+
+        try
+        {
+            Snapshot = await DashboardService.GetSnapshotAsync();
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.Data.Common.DbException)
+        {
+            Logger.LogError(exception, "Unable to load the Northwind dashboard.");
+            LoadError = "Dashboard data could not be loaded. Check the PostgreSQL connection and Northwind schema, then retry.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private static string GetMetricIcon(DashboardMetricIcon icon) => icon switch
+    {
+        DashboardMetricIcon.NetSales => Icons.Material.Filled.AttachMoney,
+        DashboardMetricIcon.Orders => Icons.Material.Filled.ShoppingBag,
+        DashboardMetricIcon.AverageOrderValue => Icons.Material.Filled.ReceiptLong,
+        DashboardMetricIcon.ReturningCustomers => Icons.Material.Filled.Replay,
+        _ => Icons.Material.Filled.Analytics
+    };
+}

@@ -1,0 +1,52 @@
+QueryPilot development progress
+Database connection
+Completed
+
+Local LLM integration
+Current
+    Local Qwen model
+
+
+
+    Text-to-SQL
+
+    Give Qwen schema context and generate PostgreSQL queries.
+
+
+
+    SQL execution
+
+    Connect generated SQL to your PostgreSQL database safely.
+
+
+
+    Answer generation
+
+    Pass query results to Qwen to explain them.
+
+
+
+    Predictive analytics
+
+    Build separate Scikit-learn models for sales forecasting.
+
+
+
+    Model optimization
+
+    Evaluate performance and fine-tune Qwen if needed.
+    
+
+Natural language to SQL
+Pending
+
+Data analysis
+Pending
+
+Machine learning predictions
+Pending
+
+
+
+
+
